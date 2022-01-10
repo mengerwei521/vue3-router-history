@@ -1,3 +1,7 @@
+# 更新说明
+
+1.0.2 更新，在每次 afterEach 后 isGo_num 清零
+
 # 安装
 
 npm i vue3-router-history
