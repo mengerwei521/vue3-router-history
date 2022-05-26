@@ -5,7 +5,8 @@ class routerHistory {
     this.router = options.router;
     this._historyList = []; //暂存push跳转的页面和首次进入的页面的仓库
     this.isPush = false; // 是不是push路由跳转
-    this.isGo_num = 0; //是不是back / go(-x)回退
+    this.isReplace = false; // 是不是replace路由跳转
+    this.isGo_num = null; //是不是back / go(-x)回退
     this.back_route_name = ''; //返回的路由
     this.isConsole = options.isConsole || false;//是否打开console调试
     this.init()
@@ -28,18 +29,25 @@ class routerHistory {
      */
     const pushRouter = this.router.push.bind(this.router)
     this.router.push = (to) => {
+      console.log(to, 'push')
       this.isPush = true;
       return pushRouter(to);
+    }
+    /**
+   * @desc replace跳转【替换】
+   */
+    const replaceRouter = this.router.replace.bind(this.router)
+    this.router.replace = (to) => {
+      console.log(to, 'replace')
+      this.isReplace = true;
+      return replaceRouter(to);
     }
     /**
      * @desc back或者go(-x)跳转 出栈
      */
     const goRouter = this.router.go.bind(this.router)
     this.router.go = (value) => {
-      console.log(value, 'goRouter')
-      if (value < 0) {
-        this.isGo_num = value
-      }
+      this.isGo_num = value
       return goRouter(value);
     }
     /**
@@ -52,40 +60,46 @@ class routerHistory {
           if (name) {
             this._historyList.push(name);
           }
-          this.isPush = false;
-
           if (this.isConsole) {
             console.log('%c 所有push进入的路由↓', 'color:yellow;background:green;')
             console.log(this._historyList)
             console.log('%c 所有push进入的路由↑', 'color:yellow;background:green;')
           }
 
-        }
-        if (this._historyList.length > 0) {
-          //如果回退层级过高，则不处理
-          if (this._historyList.includes(to.name) && this.isGo_num < 0) {
-            //代表单页面使用了 back() 或者 go(-x) 
-            if (this._historyList.length >= Math.abs(this.isGo_num)) {
+        } else if (!this.isReplace) {
+          if (this._historyList.length > 0) {
+            //如果回退层级过高，则不处理
+            console.log(this.isGo_num, 'goRouter如果回退层级过高，则不处理')
+            if (this._historyList.includes(to.name) && this.isGo_num < 0) {
+              //代表单页面使用了 back() 或者 go(-x) 
+              if (this._historyList.length >= Math.abs(this.isGo_num)) {
 
-              if (this.isConsole) {
-                console.log('%c back() 或者 go(-x) 被清除前的路由↓', 'color:yellow;background:green;')
-                console.log(this._historyList, Math.abs(this.isGo_num))
-                console.log('%c back() 或者 go(-x) 被清除前的路由↑', 'color:yellow;background:green;')
+                if (this.isConsole) {
+                  console.log('%c back() 或者 go(-x) 被清除前的路由↓', 'color:yellow;background:green;')
+                  console.log(this._historyList, Math.abs(this.isGo_num))
+                  console.log('%c back() 或者 go(-x) 被清除前的路由↑', 'color:yellow;background:green;')
+                }
+
+                this._historyList.splice(this._historyList.length - Math.abs(this.isGo_num))
+
+                if (this.isConsole) {
+                  console.log('%c back() 或者 go(-x) 被清除后的路由↓', 'color:yellow;background:green;')
+                  console.log(this._historyList)
+                  console.log('%c back() 或者 go(-x) 被清除后的路由↑', 'color:yellow;background:green;')
+                }
+
               }
-
-              this._historyList.splice(this._historyList.length - Math.abs(this.isGo_num))
-
-              if (this.isConsole) {
-                console.log('%c back() 或者 go(-x) 被清除后的路由↓', 'color:yellow;background:green;')
-                console.log(this._historyList)
-                console.log('%c back() 或者 go(-x) 被清除后的路由↑', 'color:yellow;background:green;')
-              }
-
+            } else if (this.isGo_num == null) {
+              //手机物理回退
+              this._historyList.splice(this._historyList.length - 1)
             }
           }
         }
+        this.isPush = false; // 重置 push跳转
+        this.isReplace = false;//重置 replace跳转
+        this.isGo_num = null;  // 重置go/back 跳转  使用手机物理回退键该变量会莫名添加【没有找到原因】
       }
-      this.isGo_num = 0
+
     })
 
   }
@@ -117,9 +131,9 @@ class routerHistory {
           throw `${this.back_route_name}路由不存在`
         }
         let D_value = this._historyList.length - index;
-
-        this.router.go(-`${D_value}`)
-
+        if (D_value) {
+          this.router.go(-`${D_value}`)
+        }
         this._historyList.splice(this._historyList.length - D_value);
 
         if (this.isConsole) {
@@ -143,6 +157,7 @@ class routerHistory {
   reLaunchRoute(value, query) {
     Loading(); //蒙层
     let D_value = this._historyList.length;
+    //解决 go(0) 空跳转
     if (D_value) {
       this.router.go(-`${D_value}`)
     }
@@ -159,7 +174,7 @@ class routerHistory {
       })
       this._historyList = [];
       Loading.clear();//关闭蒙层
-    }, 500)
+    }, 1000)
 
 
   }
